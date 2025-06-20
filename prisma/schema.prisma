@@ -1,0 +1,129 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Business using the SaaS
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  tier      String   @default("free")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  customers Customer[]
+  plans     Plan[]
+}
+
+// Admin, Staff, Collector accounts
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  password       String
+  role           String       @default("admin") // "admin", "staff", "collector"
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+}
+
+// Customer
+model Customer {
+  id             String       @id @default(cuid())
+  name           String
+  address        String?
+  contactPhone   String?
+  contactEmail   String?
+  tags           String[]     // "active", "delinquent", "vip"
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  subscriptions  Subscription[]
+  invoices       Invoice[]
+}
+
+// Plans
+model Plan {
+  id             String   @id @default(cuid())
+  name           String   // e.g., "Fiber 50mbps"
+  price          Float    // e.g., 999.00
+  billingCycle   String   // "monthly", "quarterly", "annually"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+
+  subscriptions  Subscription[]
+}
+
+// Subsriptions
+model Subscription {
+  id           String   @id @default(cuid())
+  status       String   // "active", "paused", "cancelled"
+  nextBillDate DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer     Customer @relation(fields: [customerId], references: [id])
+  customerId   String
+
+  plan         Plan     @relation(fields: [planId], references: [id])
+  planId       String
+
+  // Ensure a customer can only have one active subscription to a specific plan at a time
+  @@unique([customerId, planId])
+}
+
+// Invoices
+model Invoice {
+  id             String        @id @default(cuid())
+  status         String        // "draft", "sent", "paid", "overdue", "void"
+  amount         Float
+  dueDate        DateTime
+  paidDate       DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  customerId     String
+  organizationId String        // For easier querying of all invoices for an org
+
+  items          InvoiceItem[]
+  payments       Payment[] // <-- ADD THIS RELATION
+
+  // Maya Integration Fields
+  gatewayCheckoutId String? @unique
+  paymentUrl        String?
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  description String   // "Monthly Subscription: Fiber 50mbps"
+  quantity    Int      @default(1)
+  unitPrice   Float
+  
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId   String
+}
+
+model Payment {
+  id             String    @id @default(cuid())
+  amount         Float
+  method         String    // "gcash", "maya", "card", "grab_pay" etc.
+  status         String    // "succeeded", "failed"
+  gatewayRefId   String    @unique // The ID from Maya
+  createdAt      DateTime  @default(now())
+
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id])
+  invoiceId      String
+}

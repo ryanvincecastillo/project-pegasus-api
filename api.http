@@ -1,0 +1,261 @@
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbWMyN3Zha24wMDAyOWxuZG16cTNjdGExIiwiZW1haWwiOiJhZG1pbkBhd2Vzb21laXNwLmNvbSIsIm9yZ0lkIjoiY21jMjd2YWtnMDAwMDlsbmQ1MjV5eml3eSIsImlhdCI6MTc1MDI5NjA0OSwiZXhwIjoxNzUwOTAwODQ5fQ.6oZuyL9NSUY71SIJz7Qjr2x4AzFN2zIV9iey9To4eUI
+
+###
+# @name SignUp
+# Creates a new organization and a new admin user
+POST http://localhost:9000/auth/signup
+Content-Type: application/json
+
+{
+    "organizationName": "My Awesome ISP",
+    "email": "admin@awesomeisp.com",
+    "password": "password123"
+}
+
+###
+# @name SignInSuccess
+# Signs in with the correct credentials
+POST http://localhost:9000/auth/signin
+Content-Type: application/json
+
+{
+    "email": "admin@awesomeisp.com",
+    "password": "password123"
+}
+
+
+###
+# @name SignInFail
+# Attempts to sign in with the wrong password
+POST http://localhost:9000/auth/signin
+Content-Type: application/json
+
+{
+    "email": "admin@awesomeisp.com",
+    "password": "wrongpassword"
+}
+
+###
+# @name SignInInvalidBody
+# Attempts to sign in with a missing email field
+POST http://localhost:9000/auth/signin
+Content-Type: application/json
+
+{
+    "password": "password123"
+}
+
+###
+# @name GetMeFail
+# Tries to access a protected route WITHOUT a token
+GET http://localhost:9000/users/me
+
+
+###
+# @name GetMeSuccess
+# Tries to access a protected route WITH a token
+# NOTE: You must run the SignIn request first to get a valid token.
+# Then, copy the token and paste it after "Bearer ".
+GET http://localhost:9000/users/me
+Authorization: Bearer {{token}}
+
+################################################################
+# CUSTOMER MANAGEMENT
+################################################################
+
+
+###
+# @name CreateCustomer
+# Creates a new customer for the logged-in user's organization.
+POST http://localhost:9000/customers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "name": "John Doe",
+    "address": "123 Main St, Metro Manila",
+    "contactPhone": "09171234567",
+    "contactEmail": "john.doe@example.com"
+}
+
+
+###
+# @name CreateCustomerInvalid
+# Tries to create a customer with missing required data (name).
+# This should fail with a 400 Bad Request error.
+POST http://localhost:9000/customers
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "address": "456 Side St, Cebu"
+}
+
+
+###
+# @name GetAllCustomers
+# Gets a list of all customers for the logged-in user's organization.
+GET http://localhost:9000/customers
+Authorization: Bearer {{token}}
+
+@customerId = cmc29fqdq00059l1gn5klq52y
+###
+# @name GetOneCustomer
+# Gets the specific customer we just created using the saved customerId.
+GET http://localhost:9000/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+
+###
+# @name UpdateCustomer
+# Updates the name of the customer.
+PATCH http://localhost:9000/customers/{{customerId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "name": "Johnathan 'Johnny' Doe"
+}
+
+
+###
+# @name DeleteCustomer
+# Deletes the customer we created.
+DELETE http://localhost:9000/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+
+###
+# @name GetDeletedCustomer
+# Tries to get the customer again after deleting them.
+# This should fail with a 403 Forbidden/404 Not Found error.
+GET http://localhost:9000/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+################################################################
+# PLAN & SUBSCRIPTION MANAGEMENT
+################################################################
+
+###
+# @name CreatePlan
+# Creates a service plan for the organization.
+POST http://localhost:9000/plans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "name": "Fiber 50mbps",
+    "price": 999,
+    "billingCycle": "monthly"
+}
+
+
+###
+# @name CreateAnotherPlan
+# Creates a second service plan for the organization.
+POST http://localhost:9000/plans
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "name": "CCTV Monitoring",
+    "price": 499,
+    "billingCycle": "monthly"
+}
+
+###
+# @name GetAllPlans
+# Gets all plans created by the organization.
+GET http://localhost:9000/plans
+Authorization: Bearer {{token}}
+
+
+@planId = cmc29er7900019l1go5bdz0c9
+###
+# @name CreateSubscription
+# Subscribes our customer (John Doe) to the "Fiber 50mbps" plan.
+# It uses the customerId and planId saved from previous requests.
+POST http://localhost:9000/subscriptions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "customerId": "{{customerId}}",
+    "planId": "{{planId}}"
+}
+
+###
+# @name CreateDuplicateSubscription (Expected to Fail)
+# Tries to subscribe the same customer to the same plan again.
+# This should FAIL with a 500 Internal Server Error because of our unique constraint.
+POST http://localhost:9000/subscriptions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "customerId": "{{customerId}}",
+    "planId": "{{planId}}"
+}
+
+
+###
+# @name GetAllSubscriptions
+# Gets a list of all active subscriptions in the organization.
+GET http://localhost:9000/subscriptions
+Authorization: Bearer {{token}}
+
+################################################################
+# BILLING & INVOICING
+################################################################
+
+###
+# @name GetAllInvoicesBefore
+# Get all invoices. This should return an empty array initially.
+GET http://localhost:9000/invoices
+Authorization: Bearer {{token}}
+
+
+###
+# @name TriggerBillingJob
+# Manually run the billing process.
+POST http://localhost:9000/billing/run-job
+Authorization: Bearer {{token}}
+
+
+###
+# @name GetAllInvoicesAfter
+# Get all invoices again. This should now contain one new invoice.
+GET http://localhost:9000/invoices
+Authorization: Bearer {{token}}
+
+
+###
+# @name CheckSubscriptionAfterBilling
+# Get all subscriptions. The `nextBillDate` for our subscription should now be updated to one month from yesterday.
+GET http://localhost:9000/subscriptions
+Authorization: Bearer {{token}}
+
+################################################################
+# FULL END-TO-END PAYMENT TEST
+################################################################
+
+###
+# @name GetAllInvoices_E2E
+# Check invoices before running the job. Save the first one for payment.
+GET http://localhost:9000/invoices
+Authorization: Bearer {{token}}
+
+###
+# @name CheckInvoiceStatus_BeforePayment
+# Verify the status is 'sent'.
+GET http://localhost:9000/invoices/
+Authorization: Bearer {{token}}
+# In the response, find the invoice with id: {{invoiceId}} and check its status.
+
+###
+# @name CheckInvoiceStatus_AfterPayment
+# After you "pay" in the browser, run this to see if the webhook worked.
+# The status should now be 'paid'.
+GET http://localhost:9000/invoices/
+Authorization: Bearer {{token}}
+# In the response, find the invoice with id: {{invoiceId}} and check its status.
